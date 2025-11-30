@@ -9,6 +9,8 @@ export interface IUser extends Document {
   password: string;
   role: UserRole;
   isVerified: boolean;
+  status: "pending" | "active" | "rejected";
+  isSuspended: boolean;
   emailVerificationToken?: string | null;
   emailVerificationExpires?: Date | null;
   resetPasswordToken?: string | null;
@@ -16,10 +18,9 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   isPhoneVerified?: boolean;
-firebaseUid?: string | null;
+  firebaseUid?: string | null;
   phoneVerificationToken?: string | null;
   phoneVerificationExpires?: Date | null;
-
 }
 
 const userSchema = new mongoose.Schema<IUser>(
@@ -41,18 +42,27 @@ const userSchema = new mongoose.Schema<IUser>(
       enum: ["user", "provider", "admin"],
       default: "user",
     },
+    status: {
+      type: String,
+      enum: ["pending", "active", "rejected"],
+      default: "pending",
+    },
+    isSuspended: {
+      type: Boolean,
+      default: false,
+    },
     isVerified: {
       type: Boolean,
       default: false,
     },
     isPhoneVerified: {
-  type: Boolean,
-  default: false,
-},
-firebaseUid: {
-  type: String,
-  default: null,
-},
+      type: Boolean,
+      default: false,
+    },
+    firebaseUid: {
+      type: String,
+      default: null,
+    },
     phoneVerificationToken: { type: String, default: null },
     phoneVerificationExpires: { type: Date, default: null },
 

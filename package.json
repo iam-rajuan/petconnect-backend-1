@@ -8,7 +8,8 @@
     "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "ts-node src/server.ts",
-    "start:prod": "npm run build && node dist/server.js"
+    "start:prod": "npm run build && node dist/server.js",
+    "create-admin": "ts-node src/scripts/createAdminUser.ts"
   },
   "keywords": [],
   "author": "",
