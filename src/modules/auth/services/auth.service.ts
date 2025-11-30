@@ -11,50 +11,65 @@ import {
 } from "../validations/auth.validation";
 import { signAccessToken, signRefreshToken, verifyToken } from "../../../utils/jwt";
 import { sendMail } from "../../../utils/mail";
+type Carrier = "verizon" | "att" | "tmobile" | "sprint";
 
-import { sendFirebaseOtp, verifyFirebaseOtp } from "../../../utils/firebase-sms";
-
-
-
-
-
-export const sendPhoneOtp = async ({ phone }: { phone: string }) => {
-  const sessionInfo = await sendFirebaseOtp(phone);
-  return sessionInfo;
+const carrierGateways: Record<Carrier, string> = {
+  verizon: "vtext.com",
+  att: "txt.att.net",
+  tmobile: "tmomail.net",
+  sprint: "messaging.sprintpcs.com",
 };
 
-export const verifyPhoneOtp = async ({
-  phone,
-  otp,
-  sessionInfo,
-}: {
-  phone: string;
-  otp: string;
-  sessionInfo: string;
-}) => {
-  const result = await verifyFirebaseOtp(sessionInfo, otp);
+export const sendPhoneOtp = async ({ phone, carrier }: { phone: string; carrier: Carrier }) => {
+  const sanitizedPhone = phone.trim();
+  const gateway = carrierGateways[carrier];
+  const otp = generateOtp();
+  const expiresAt = addMinutes(10);
 
-  let user = await User.findOne({ phone });
+  let user = await User.findOne({ phone: sanitizedPhone });
 
   if (!user) {
     user = await User.create({
-      phone,
-      isPhoneVerified: true,
-      firebaseUid: result.localId,
-      name: "User-" + phone,
-      password: "", // not needed
+      phone: sanitizedPhone,
+      name: "User-" + sanitizedPhone,
+      password: "",
     });
   }
 
-  const payload = { id: user._id.toString(), role: user.role };
+  user.phoneVerificationToken = otp;
+  user.phoneVerificationExpires = expiresAt;
+  user.isPhoneVerified = false;
+  await user.save();
 
-  return {
-    user,
-    tokens: {
-      accessToken: signAccessToken(payload),
-      refreshToken: signRefreshToken(payload),
-    },
-  };
+  await sendMail({
+    to: `${sanitizedPhone}@${gateway}`,
+    subject: "Phone verification code",
+    text: `Your verification OTP is ${otp}. It expires in 10 minutes.`,
+  });
+};
+
+export const verifyPhoneOtp = async ({ phone, otp }: { phone: string; otp: string }) => {
+  const sanitizedPhone = phone.trim();
+  const user = await User.findOne({ phone: sanitizedPhone });
+
+  if (
+    !user ||
+    !user.phoneVerificationToken ||
+    !user.phoneVerificationExpires ||
+    user.phoneVerificationToken !== otp ||
+    user.phoneVerificationExpires < new Date()
+  ) {
+    throw new Error("Invalid or expired OTP");
+  }
+
+  user.isPhoneVerified = true;
+  user.phoneVerificationToken = null;
+  user.phoneVerificationExpires = null;
+  await user.save();
+
+  const tokens = await buildTokens(user);
+
+  return { user, tokens };
 };
 
 

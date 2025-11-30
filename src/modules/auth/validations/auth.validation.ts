@@ -66,12 +66,16 @@ export const resetPasswordSchema = z.object({
 
 
 export const sendPhoneOtpSchema = z.object({
-  phone: z.string().min(10, "Phone is required"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{10}$/, "Phone must be a 10-digit US number"),
+  carrier: z.enum(["verizon", "att", "tmobile", "sprint"], { message: "Carrier is required" }),
 });
 
 export const verifyPhoneOtpSchema = z.object({
-  phone: z.string(),
-  otp: z.string().length(6, "OTP must be 6 digits"),
+  phone: z.string().trim().regex(/^[0-9]{10}$/, "Phone must be a 10-digit US number"),
+  otp: z.string().trim().length(6, "OTP must be 6 digits"),
 });
 
 export type SendPhoneOtpInput = z.infer<typeof sendPhoneOtpSchema>;

@@ -17,6 +17,8 @@ export interface IUser extends Document {
   updatedAt: Date;
   isPhoneVerified?: boolean;
 firebaseUid?: string | null;
+  phoneVerificationToken?: string | null;
+  phoneVerificationExpires?: Date | null;
 
 }
 
@@ -33,7 +35,7 @@ const userSchema = new mongoose.Schema<IUser>(
       unique: true,
       sparse: true,
     },
-    password: { type: String, required: true },
+    password: { type: String, required: false, default: null },
     role: {
       type: String,
       enum: ["user", "provider", "admin"],
@@ -51,6 +53,8 @@ firebaseUid: {
   type: String,
   default: null,
 },
+    phoneVerificationToken: { type: String, default: null },
+    phoneVerificationExpires: { type: Date, default: null },
 
     emailVerificationToken: { type: String, default: null },
     emailVerificationExpires: { type: Date, default: null },
