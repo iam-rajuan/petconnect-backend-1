@@ -1,6 +1,4 @@
-# ============================
 # Logs
-# ============================
 logs/
 *.log
 npm-debug.log*
@@ -9,9 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# ============================
 # Node Modules & Build
-# ============================
 node_modules/
 dist/
 dist-ssr/
@@ -20,9 +16,7 @@ build/
 # Local environment configs
 *.local
 
-# ============================
 # Environment Variables
-# ============================
 .env
 .env.local
 .env.*.local
@@ -30,9 +24,7 @@ build/
 .env.production
 .env.test
 
-# ============================
 # Editor directories and files
-# ============================
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -42,15 +34,11 @@ build/
 *.sln
 *.sw?
 
-# ============================
 # System Files
-# ============================
 .DS_Store
 Thumbs.db
 
-# ============================
 # Optional (remove if unused)
-# ============================
 coverage/
 tmp/
 temp/
