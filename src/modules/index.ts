@@ -11,6 +11,12 @@ export interface ModuleDefinition {
   router: Router;
 }
 
-const modules: ModuleDefinition[] = [authModule, adminModule, petsModule, uploadsModule];
+const modules: ModuleDefinition[] = [
+  authModule,
+  adminModule,
+  petsModule,
+  uploadsModule,
+  adoptionModule,
+];
 
 export default modules;
