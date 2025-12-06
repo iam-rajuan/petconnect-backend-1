@@ -97,5 +97,6 @@ export const deleteAdoptionListing = async (req: AuthRequest, res: Response) => 
     const status =
       message === "Adoption listing not found or not authorized to delete" ? 404 : 400;
     res.status(status).json({ success: false, message });
+    
   }
 };
