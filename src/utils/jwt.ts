@@ -13,6 +13,7 @@ export interface AuthTokenPayload extends JwtPayload {
   id: string;
   role: string;
   type: TokenType;
+  tokenVersion?: number;
 }
 
 const signToken = (

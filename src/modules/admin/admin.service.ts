@@ -1,140 +1,246 @@
-import User, { IUser, UserRole } from "../users/user.model";
+import bcrypt from "bcrypt";
+import Admin, { IAdmin } from "./admin.model";
+import AdminRefreshToken, { IAdminRefreshToken } from "./adminRefreshToken.model";
+import {
+  AdminLoginInput,
+  RefreshTokenInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  UpdateProfileInput,
+} from "./admin.validation";
+import { signAccessToken, signRefreshToken, verifyToken } from "../../utils/jwt";
+import { sendMail } from "../../utils/mail";
 
-export interface PaginatedUsers {
-  data: IUser[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
+export interface AdminTokens {
+  accessToken: string;
+  refreshToken: string;
 }
 
-const sanitizePagination = (page?: number, limit?: number) => {
-  const safePage = !page || Number.isNaN(page) || page < 1 ? 1 : Math.floor(page);
-  const safeLimit =
-    !limit || Number.isNaN(limit) || limit < 1 || limit > 100 ? 10 : Math.floor(limit);
-  return { page: safePage, limit: safeLimit };
+export interface AdminProfile {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+const generateOtp = (): string => Math.floor(100000 + Math.random() * 900000).toString();
+
+const addMinutes = (minutes: number): Date => {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + minutes);
+  return date;
 };
 
-export const listUsers = async (page?: number, limit?: number): Promise<PaginatedUsers> => {
-  const { page: currentPage, limit: pageLimit } = sanitizePagination(page, limit);
-  const skip = (currentPage - 1) * pageLimit;
+const saveRefreshToken = async (adminId: string, token: string, expiresAt: Date) => {
+  const hashedToken = await bcrypt.hash(token, 10);
+  await AdminRefreshToken.create({
+    admin: adminId,
+    token: hashedToken,
+    expiresAt,
+    revoked: false,
+  });
+};
 
-  const [data, total] = await Promise.all([
-    User.find().sort({ createdAt: -1 }).skip(skip).limit(pageLimit),
-    User.countDocuments(),
-  ]);
+const buildTokens = async (admin: IAdmin): Promise<AdminTokens> => {
+  const payload = {
+    id: admin._id.toString(),
+    role: "admin",
+    tokenVersion: admin.tokenVersion ?? 0,
+  };
+  const accessToken = signAccessToken(payload);
+  const refreshToken = signRefreshToken(payload);
 
-  const totalPages = Math.ceil(total / pageLimit) || 1;
+  const decodedRefresh = verifyToken(refreshToken);
+  const expiresAt = decodedRefresh.exp ? new Date(decodedRefresh.exp * 1000) : new Date();
+  await saveRefreshToken(admin._id.toString(), refreshToken, expiresAt);
 
+  return { accessToken, refreshToken };
+};
+
+const findMatchingRefreshToken = async (
+  adminId: string,
+  rawToken: string
+): Promise<IAdminRefreshToken | null> => {
+  const activeTokens = await AdminRefreshToken.find({
+    admin: adminId,
+    revoked: false,
+    expiresAt: { $gt: new Date() },
+  });
+
+  for (const tokenDoc of activeTokens) {
+    const isMatch = await bcrypt.compare(rawToken, tokenDoc.token);
+    if (isMatch) {
+      return tokenDoc;
+    }
+  }
+
+  return null;
+};
+
+const requireAdmin = (admin?: IAdmin | null): IAdmin => {
+  if (!admin) {
+    throw new Error("Admin not found");
+  }
+  return admin;
+};
+
+export const login = async ({
+  email,
+  password,
+}: AdminLoginInput): Promise<{ user: IAdmin; tokens: AdminTokens }> => {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const sanitizedPassword = password?.trim();
+
+  if (!normalizedEmail) {
+    throw new Error("Email is required");
+  }
+
+  const admin = await Admin.findOne({ email: normalizedEmail });
+  const adminUser = requireAdmin(admin);
+
+  if (!sanitizedPassword) {
+    throw new Error("Password is required");
+  }
+
+  const match = await bcrypt.compare(sanitizedPassword, adminUser.password);
+  if (!match) {
+    throw new Error("Invalid credentials");
+  }
+
+  if (!adminUser.isVerified) {
+    throw new Error("Email not verified");
+  }
+
+  const tokens = await buildTokens(adminUser);
+
+  return { user: adminUser, tokens };
+};
+
+export const refreshTokens = async ({ refreshToken }: RefreshTokenInput): Promise<AdminTokens> => {
+  const decoded = verifyToken(refreshToken);
+
+  if (decoded.type !== "refresh") {
+    throw new Error("Invalid token type");
+  }
+
+  const adminUser = requireAdmin(await Admin.findById(decoded.id));
+  const tokenVersion = decoded.tokenVersion ?? 0;
+  const currentVersion = adminUser.tokenVersion ?? 0;
+  if (tokenVersion != currentVersion) {
+    throw new Error("Token revoked");
+  }
+
+  const tokenDoc = await findMatchingRefreshToken(decoded.id, refreshToken);
+  if (!tokenDoc) {
+    throw new Error("Refresh token is invalid or expired");
+  }
+
+  tokenDoc.revoked = true;
+  tokenDoc.revokedAt = new Date();
+  await tokenDoc.save();
+
+  return buildTokens(adminUser);
+};
+
+export const logout = async ({ refreshToken }: RefreshTokenInput): Promise<void> => {
+  const decoded = verifyToken(refreshToken);
+
+  if (decoded.type !== "refresh") {
+    throw new Error("Invalid token type");
+  }
+
+  const adminUser = requireAdmin(await Admin.findById(decoded.id));
+
+  const tokenDoc = await findMatchingRefreshToken(adminUser._id.toString(), refreshToken);
+  if (tokenDoc) {
+    tokenDoc.revoked = true;
+    tokenDoc.revokedAt = new Date();
+    await tokenDoc.save();
+  }
+
+  await AdminRefreshToken.updateMany(
+    { admin: adminUser._id, revoked: false },
+    { revoked: true, revokedAt: new Date() }
+  );
+  adminUser.tokenVersion = (adminUser.tokenVersion ?? 0) + 1;
+  await adminUser.save();
+};
+
+export const forgotPassword = async ({ email }: ForgotPasswordInput): Promise<void> => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const adminUser = await Admin.findOne({ email: normalizedEmail });
+  if (!adminUser) {
+    return;
+  }
+  const otp = generateOtp();
+  adminUser.resetPasswordToken = otp;
+  adminUser.resetPasswordExpires = addMinutes(10);
+  await adminUser.save();
+
+  await sendMail({
+    to: normalizedEmail,
+    subject: "Admin Password Reset OTP",
+    text: `Your password reset OTP is ${otp}. It expires in 10 minutes.`,
+  });
+};
+
+export const resetPassword = async ({
+  email,
+  otp,
+  password,
+}: ResetPasswordInput): Promise<void> => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const adminUser = requireAdmin(await Admin.findOne({ email: normalizedEmail }));
+  if (
+    !adminUser.resetPasswordToken ||
+    !adminUser.resetPasswordExpires ||
+    adminUser.resetPasswordToken !== otp ||
+    adminUser.resetPasswordExpires < new Date()
+  ) {
+    throw new Error("Invalid or expired OTP");
+  }
+
+  const hashed = await bcrypt.hash(password.trim(), 10);
+  adminUser.password = hashed;
+  adminUser.resetPasswordToken = null;
+  adminUser.resetPasswordExpires = null;
+  await adminUser.save();
+};
+
+export const getProfile = async (adminId: string): Promise<AdminProfile> => {
+  const adminUser = requireAdmin(await Admin.findById(adminId));
   return {
-    data,
-    page: currentPage,
-    limit: pageLimit,
-    total,
-    totalPages,
+    id: adminUser._id.toString(),
+    name: adminUser.name,
+    email: adminUser.email,
   };
 };
 
-export const getUserById = async (id: string): Promise<IUser> => {
-  const user = await User.findById(id);
-  if (!user) {
-    throw new Error("User not found");
+export const updateProfile = async (
+  adminId: string,
+  payload: UpdateProfileInput
+): Promise<AdminProfile> => {
+  const adminUser = requireAdmin(await Admin.findById(adminId));
+
+  if (payload.name) {
+    adminUser.name = payload.name.trim();
   }
-  return user;
-};
 
-export const updateUserStatus = async (
-  id: string,
-  status: "pending" | "active" | "rejected"
-): Promise<IUser> => {
-  const user = await User.findByIdAndUpdate(
-    id,
-    { status },
-    { new: true, runValidators: true }
-  );
-  if (!user) {
-    throw new Error("User not found");
+  if (payload.email) {
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    if (normalizedEmail !== adminUser.email) {
+      const existing = await Admin.findOne({ email: normalizedEmail, _id: { $ne: adminId } });
+      if (existing) {
+        throw new Error("Email already in use");
+      }
+      adminUser.email = normalizedEmail;
+    }
   }
-  return user;
-};
 
-export const updateUserRole = async (id: string, role: UserRole): Promise<IUser> => {
-  const user = await User.findByIdAndUpdate(
-    id,
-    { role },
-    { new: true, runValidators: true }
-  );
-  if (!user) {
-    throw new Error("User not found");
-  }
-  return user;
-};
+  await adminUser.save();
 
-export const suspendUser = async (id: string): Promise<IUser> => {
-  const user = await User.findByIdAndUpdate(
-    id,
-    { isSuspended: true },
-    { new: true, runValidators: true }
-  );
-  if (!user) {
-    throw new Error("User not found");
-  }
-  return user;
-};
-
-export const unsuspendUser = async (id: string): Promise<IUser> => {
-  const user = await User.findByIdAndUpdate(
-    id,
-    { isSuspended: false },
-    { new: true, runValidators: true }
-  );
-  if (!user) {
-    throw new Error("User not found");
-  }
-  return user;
-};
-
-// Placeholder service stubs (to be implemented later)
-export const createProvider = async () => {
-  // TODO: implement provider creation logic
-};
-
-export const listProviders = async () => {
-  // TODO: implement provider listing logic
-};
-
-export const approveAdoptionListing = async () => {
-  // TODO: implement adoption listing approval logic
-};
-
-export const changeAdoptionState = async () => {
-  // TODO: implement adoption state change logic
-};
-
-export const removePost = async () => {
-  // TODO: implement post removal logic
-};
-
-export const removeComment = async () => {
-  // TODO: implement comment removal logic
-};
-
-export const listTransactions = async () => {
-  // TODO: implement transaction listing logic
-};
-
-export const viewPaymentDetails = async () => {
-  // TODO: implement payment detail view logic
-};
-
-export const userAnalytics = async () => {
-  // TODO: implement user analytics logic
-};
-
-export const providerAnalytics = async () => {
-  // TODO: implement provider analytics logic
-};
-
-export const adoptionAnalytics = async () => {
-  // TODO: implement adoption analytics logic
+  return {
+    id: adminUser._id.toString(),
+    name: adminUser.name,
+    email: adminUser.email,
+  };
 };

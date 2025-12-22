@@ -1,80 +1,29 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router } from "express";
 import validate from "../../middlewares/validate.middleware";
-import auth from "../../middlewares/auth.middleware";
-import { requireRole } from "../../middlewares/role.middleware";
-import {
-  paginationSchema,
-  userIdParamSchema,
-  updateUserRoleSchema,
-  updateUserStatusSchema,
-} from "./admin.validators";
+import adminAuth from "./admin.middleware";
 import * as adminController from "./admin.controller";
-import { ZodError, ZodSchema } from "zod";
+import {
+  adminLoginSchema,
+  refreshTokenSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from "./admin.validation";
 
 const router = Router();
 
-const validateQuery =
-  (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = schema.parse(req.query);
-      req.query = parsed as typeof req.query;
-      next();
-    } catch (err) {
-      const isZodError = err instanceof ZodError;
-      return res.status(400).json({
-        success: false,
-        message: isZodError
-          ? err.issues?.[0]?.message || "Validation failed"
-          : "Validation failed",
-        issues: isZodError ? err.issues : err,
-      });
-    }
-  };
+router.post("/auth/login", validate(adminLoginSchema), adminController.login);
+router.post("/auth/refresh", validate(refreshTokenSchema), adminController.refresh);
+router.post("/auth/logout", validate(refreshTokenSchema), adminController.logout);
+router.post("/auth/forgot-password", validate(forgotPasswordSchema), adminController.forgotPassword);
+router.post("/auth/reset-password", validate(resetPasswordSchema), adminController.resetPassword);
 
-const validateParams =
-  (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = schema.parse(req.params);
-      req.params = parsed as typeof req.params;
-      next();
-    } catch (err) {
-      const isZodError = err instanceof ZodError;
-      return res.status(400).json({
-        success: false,
-        message: isZodError
-          ? err.issues?.[0]?.message || "Validation failed"
-          : "Validation failed",
-        issues: isZodError ? err.issues : err,
-      });
-    }
-  };
-
-router.use(auth, requireRole("admin"));
-
-router.get("/users", adminController.listUsers);
-// router.get("/users", validateQuery(paginationSchema), adminController.listUsers);
-router.get("/users/:id", validateParams(userIdParamSchema), adminController.getUser);
+router.get("/profile", adminAuth, adminController.getProfile);
 router.patch(
-  "/users/:id/status",
-  validateParams(userIdParamSchema),
-  validate(updateUserStatusSchema),
-  adminController.updateUserStatus
-);
-router.patch(
-  "/users/:id/role",
-  validateParams(userIdParamSchema),
-  validate(updateUserRoleSchema),
-  adminController.updateUserRole
-);
-router.patch(
-  "/users/:id/suspend",
-  validateParams(userIdParamSchema),
-  adminController.suspendUser
-);
-router.patch(
-  "/users/:id/unsuspend",
-  validateParams(userIdParamSchema),
-  adminController.unsuspendUser
+  "/profile",
+  adminAuth,
+  validate(updateProfileSchema),
+  adminController.updateProfile
 );
 
 export default router;

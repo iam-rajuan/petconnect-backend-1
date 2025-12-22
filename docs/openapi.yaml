@@ -7,6 +7,8 @@ servers:
 tags:
   - name: Auth
   - name: Uploads
+  - name: AdminAuth
+  - name: AdminProfile
 components:
   securitySchemes:
     AccessToken:
@@ -171,7 +173,193 @@ components:
           type: string
         refreshToken:
           type: string
+    AdminLoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@petconnect.com
+        password:
+          type: string
+          format: password
+          example: AdminSecret123
+    AdminProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 64f1c3e2d2f2b70012a8b0aa
+        name:
+          type: string
+          example: Admin Name
+        email:
+          type: string
+          format: email
+          example: admin@petconnect.com
+    AdminUpdateProfileInput:
+      type: object
+      properties:
+        name:
+          type: string
+          example: New Admin Name
+        email:
+          type: string
+          format: email
+          example: newadmin@petconnect.com
 paths:
+  /admin/auth/login:
+    post:
+      tags: [AdminAuth]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+                      tokens:
+                        $ref: "#/components/schemas/AuthTokens"
+        "400":
+          description: Login failed
+  /admin/auth/refresh:
+    post:
+      tags: [AdminAuth]
+      summary: Refresh admin tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenInput"
+      responses:
+        "200":
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/AuthTokens"
+        "400":
+          description: Refresh failed
+  /admin/auth/logout:
+    post:
+      tags: [AdminAuth]
+      summary: Logout admin by revoking refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenInput"
+      responses:
+        "200":
+          description: Logged out
+        "400":
+          description: Logout failed
+  /admin/auth/forgot-password:
+    post:
+      tags: [AdminAuth]
+      summary: Request admin password reset OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordInput"
+      responses:
+        "200":
+          description: OTP sent if email exists
+        "400":
+          description: Request failed
+  /admin/auth/reset-password:
+    post:
+      tags: [AdminAuth]
+      summary: Reset admin password with OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password reset
+        "400":
+          description: Reset failed
+  /admin/profile:
+    get:
+      tags: [AdminProfile]
+      summary: Get admin profile
+      security:
+        - AccessToken: []
+      responses:
+        "200":
+          description: Admin profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/AdminProfile"
+        "401":
+          description: Unauthorized
+    patch:
+      tags: [AdminProfile]
+      summary: Update admin profile
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateProfileInput"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/AdminProfile"
+        "400":
+          description: Update failed
+        "401":
+          description: Unauthorized
   /auth/register:
     post:
       tags: [Auth]

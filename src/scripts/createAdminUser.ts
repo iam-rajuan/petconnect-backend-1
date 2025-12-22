@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import { config } from "dotenv";
-import User from "../modules/users/user.model";
+import Admin from "../modules/admin/admin.model";
 
 config();
 
@@ -15,7 +15,7 @@ const run = async () => {
   await mongoose.connect(MONGO_URI);
   console.log("Connected to MongoDB");
 
-  const existing = await User.findOne({ email: "admin@petconnect.com" });
+  const existing = await Admin.findOne({ email: "admin@carelypet.com" });
   if (existing) {
     console.log("Admin user already exists. Nothing to do.");
     return;
@@ -25,19 +25,15 @@ const run = async () => {
   const plainPassword = process.env.ADMIN_PASSWORD || "ChangeMe123!";
   const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-  await User.create({
+  await Admin.create({
     name: "Super Admin",
-    email: "admin@petconnect.com",
+    email: "admin@carelypet.com",
     password: hashedPassword,
-    role: "admin",
     isVerified: true,
-    status: "active",
-    isSuspended: false,
-    profileCompleted: true,
   });
 
   console.log("Admin user created:");
-  console.log(`email: admin@petconnect.com`);
+  console.log(`email: admin@carelypet.com`);
   console.log(`password: ${plainPassword}`);
 };
 
