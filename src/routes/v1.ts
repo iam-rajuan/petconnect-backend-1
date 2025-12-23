@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 import modules, { ModuleDefinition } from "../modules";
-import usersRoutes from "../modules/users/users.routes";
 
 const router = express.Router();
 
@@ -16,7 +15,5 @@ modules.forEach(({ name, basePath, router: moduleRouter }: ModuleDefinition) => 
   if (!moduleRouter) return;
   router.use(basePath || `/${name}`, moduleRouter);
 });
-
-router.use("/users", usersRoutes);
 
 export default router;

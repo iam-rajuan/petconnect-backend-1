@@ -5,10 +5,11 @@ info:
 servers:
   - url: /api/v1
 tags:
-  - name: Auth
-  - name: Uploads
   - name: AdminAuth
   - name: AdminProfile
+  - name: AdminPets
+  - name: UserAuth
+  - name: UserUploads
 components:
   securitySchemes:
     AccessToken:
@@ -208,6 +209,73 @@ components:
           type: string
           format: email
           example: newadmin@petconnect.com
+    PetType:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 64f1c3e2d2f2b70012a8b0aa
+        name:
+          type: string
+          example: Dog
+        slug:
+          type: string
+          example: dog
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PetBreed:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 64f1c3e2d2f2b70012a8b0bb
+        name:
+          type: string
+          example: Labrador
+        slug:
+          type: string
+          example: labrador
+        petType:
+          type: string
+          example: 64f1c3e2d2f2b70012a8b0aa
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreatePetTypeInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Dog
+    UpdatePetTypeInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Small Pet
+    CreatePetBreedInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Labrador
+    UpdatePetBreedInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Golden Retriever
 paths:
   /admin/auth/login:
     post:
@@ -360,9 +428,237 @@ paths:
           description: Update failed
         "401":
           description: Unauthorized
+  /admin/pet-types:
+    post:
+      tags: [AdminPets]
+      summary: Create pet type
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePetTypeInput"
+      responses:
+        "201":
+          description: Pet type created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PetType"
+        "400":
+          description: Validation failed
+    get:
+      tags: [AdminPets]
+      summary: Get all pet types
+      security:
+        - AccessToken: []
+      responses:
+        "200":
+          description: Pet types list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PetType"
+        "401":
+          description: Unauthorized
+  /admin/pet-types/{id}:
+    patch:
+      tags: [AdminPets]
+      summary: Update pet type
+      security:
+        - AccessToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePetTypeInput"
+      responses:
+        "200":
+          description: Pet type updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/PetType"
+        "400":
+          description: Validation failed
+        "404":
+          description: Not found
+    delete:
+      tags: [AdminPets]
+      summary: Delete pet type
+      security:
+        - AccessToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pet type deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "404":
+          description: Not found
+  /admin/pet-types/{typeId}/breeds:
+    post:
+      tags: [AdminPets]
+      summary: Create pet breed
+      security:
+        - AccessToken: []
+      parameters:
+        - name: typeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePetBreedInput"
+      responses:
+        "201":
+          description: Pet breed created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/PetBreed"
+        "400":
+          description: Validation failed
+        "404":
+          description: Pet type not found
+    get:
+      tags: [AdminPets]
+      summary: Get pet breeds by type
+      security:
+        - AccessToken: []
+      parameters:
+        - name: typeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pet breeds list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PetBreed"
+        "404":
+          description: Pet type not found
+  /admin/pet-breeds/{id}:
+    patch:
+      tags: [AdminPets]
+      summary: Update pet breed
+      security:
+        - AccessToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePetBreedInput"
+      responses:
+        "200":
+          description: Pet breed updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/PetBreed"
+        "404":
+          description: Pet breed not found
+    delete:
+      tags: [AdminPets]
+      summary: Delete pet breed
+      security:
+        - AccessToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pet breed deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "404":
+          description: Pet breed not found
   /auth/register:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Register a new user and send email OTP
       requestBody:
         required: true
@@ -395,7 +691,7 @@ paths:
           description: Registration failed
   /auth/verify-email:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Verify email OTP and get setup token
       requestBody:
         required: true
@@ -428,7 +724,7 @@ paths:
           description: Verification failed
   /auth/resend-email-otp:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Resend email OTP
       requestBody:
         required: true
@@ -443,7 +739,7 @@ paths:
           description: Resend failed
   /auth/login:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Login with email and password
       requestBody:
         required: true
@@ -478,7 +774,7 @@ paths:
           description: Login failed
   /auth/complete-profile:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Complete onboarding and receive tokens
       security:
         - SetupToken: []
@@ -514,7 +810,7 @@ paths:
           description: Unauthorized
   /auth/refresh:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Refresh access and refresh tokens
       requestBody:
         required: true
@@ -540,7 +836,7 @@ paths:
           description: Refresh failed
   /auth/logout:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Logout by revoking refresh token
       requestBody:
         required: true
@@ -555,7 +851,7 @@ paths:
           description: Logout failed
   /auth/forgot-password:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Request password reset OTP
       requestBody:
         required: true
@@ -570,7 +866,7 @@ paths:
           description: Request failed
   /auth/reset-password:
     post:
-      tags: [Auth]
+      tags: [UserAuth]
       summary: Reset password with OTP
       requestBody:
         required: true
@@ -585,7 +881,7 @@ paths:
           description: Reset failed
   /uploads/user/avatar:
     post:
-      tags: [Uploads]
+      tags: [UserUploads]
       summary: Upload user avatar (accepts setup or access token)
       security:
         - SetupToken: []

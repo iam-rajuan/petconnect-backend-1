@@ -1,11 +1,6 @@
 import { Router } from "express";
-import authModule from "./auth";
 import adminModule from "./admin";
-import petsModule from "./pets";
-import uploadsModule from "./uploads";
-import adoptionModule from "./adoption";
-import providersModule from "./providers";
-import appointmentsModule from "./appointments";
+import userModules from "./user";
 
 export interface ModuleDefinition {
   name: string;
@@ -13,14 +8,6 @@ export interface ModuleDefinition {
   router: Router;
 }
 
-const modules: ModuleDefinition[] = [
-  authModule,
-  adminModule,
-  petsModule,
-  uploadsModule,
-  adoptionModule,
-  providersModule,
-  appointmentsModule,
-];
+const modules: ModuleDefinition[] = [adminModule, ...userModules];
 
 export default modules;
