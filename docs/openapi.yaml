@@ -151,6 +151,9 @@ components:
         role:
           type: string
           example: user
+        status:
+          type: string
+          enum: [active, deletion_request]
         username:
           type: string
           example: jane_doe
@@ -296,6 +299,16 @@ components:
           type: string
           format: email
           example: newadmin@petconnect.com
+    AdminChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+        newPassword:
+          type: string
+          format: password
     PetType:
       type: object
       properties:
@@ -484,6 +497,34 @@ paths:
                     type: boolean
                   data:
                     $ref: "#/components/schemas/AdminProfile"
+        "401":
+          description: Unauthorized
+  /admin/profile/password:
+    patch:
+      tags: [AdminProfile]
+      summary: Change admin password
+      security:
+        - AccessToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "400":
+          description: Change failed
         "401":
           description: Unauthorized
     patch:
@@ -740,6 +781,21 @@ paths:
                       $ref: "#/components/schemas/AdminUserSummary"
         "401":
           description: Unauthorized
+  /admin/users/export:
+    get:
+      tags: [AdminUsers]
+      summary: Export pet owners as CSV
+      security:
+        - AccessToken: []
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
   /admin/users/{id}:
     get:
       tags: [AdminUsers]
@@ -795,31 +851,6 @@ paths:
           description: Unauthorized
         "404":
           description: User not found
-    delete:
-      tags: [AdminPets]
-      summary: Delete pet breed
-      security:
-        - AccessToken: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Pet breed deleted
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-        "404":
-          description: Pet breed not found
   /auth/register:
     post:
       tags: [UserAuth]
@@ -1249,6 +1280,30 @@ paths:
                     $ref: "#/components/schemas/DeletionRequestResponse"
         "400":
           description: Request failed
+        "401":
+          description: Unauthorized
+  /users/me/delete-request/withdraw:
+    post:
+      tags: [UserProfiles]
+      summary: Withdraw account deletion request
+      security:
+        - AccessToken: []
+      responses:
+        "200":
+          description: Deletion request withdrawn
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/DeletionRequestResponse"
+        "400":
+          description: Withdraw failed
         "401":
           description: Unauthorized
   /users/{id}:
